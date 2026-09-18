@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Seancryption</title>
+        <script src="seancryption.js" defer></script>
+    </head>
+    <body>
+        <form id="input">
+            <textarea id="msg" cols="60" rows="18" style="resize: none" placeholder="Input seancrypted message..."></textarea>
+            <br />
+            <label for="key">Key: </label>
+            <input type="text" id="key" />
+            <label for="ovr">Override: </label>
+            <input type="text" id="ovr" />
+            <br />
+            <select id="pat">
+                <option>0</option>
+                <option>0246135</option>
+                <option>012346 012356 012456 013456 023456 12345</option>
+                <option>012 234 456 601 123 345 560</option>
+                <option>01234 45601 12345 56012 23456 60123 34560</option>
+                <option>0123456 6012345 5601234 4560123 3456012 2345601 1234560</option>
+                <option>012456 123560 234601 345012 456123 560234 601345</option>
+                <option>0123456 1234560 2345601 3456012 4560123 5601234 6012345</option>
+            </select>
+            <br />
+            <select id="dir">
+                <option value="encode">Encode</option>
+                <option value="decode">Decode</option>
+            </select>
+            <br />
+            <label for="b64">Base64 decode</label>
+            <input type="checkbox" id="b64" checked />
+        </form>
+        <br />
+        <textarea id="output" cols="60" rows="18" style="resize: none" placeholder="Output..." readonly></textarea>
+    </body>
+</html>

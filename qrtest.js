@@ -1,3 +1,4 @@
+//"use strict";
 
 //
 // VERSION 8 QR (49x49)
@@ -28,44 +29,363 @@ const QR_SOURCE = "\
 █ ███ █ ▄█▀▄ ▄ █▀▄▀▀▄▀▀▀▀▀▀▀▄▀█▀▄▀  █▀▀ ██▀██▄  ▀\n\
 █ ▀▀▀ █  ▄██▄▀▄█▄▀▀  ██ ▄▀▀▀▀▄█ ▀ ▀ █▄ █▄█ ██ ▀▀▀\n\
 ▀▀▀▀▀▀▀  ▀ ▀▀▀  ▀▀▀   ▀ ▀▀    ▀▀▀ ▀ ▀  ▀   ▀▀▀ ▀▀";
-const qr_size = 49;
 
-// create QR array
-let qr = Array(qr_size);
-for (let i = 0; i < qr_size; i++) {
-    qr[i] = Array(qr_size);
+const QR = {
+    FN_DATA:    0b000, // 0 - data
+    FN_FINDER:  0b001, // 1 - finder pattern
+    FN_ALIGN:   0b010, // 2 - alignment pattern
+    FN_TIMING:  0b011, // 3 - timing pattern
+    FN_FORMAT:  0b100, // 4 - format info
+    FN_VERSION: 0b101, // 5 - version info
+    FN_DARK:    0b110, // 6 - dark module
+    FN_SEP:     0b111, // 7 - seperator
+
+    set_size_and_reset(size) {
+        this.size = size;
+        this.data = Array.from({length: size}, () => Uint8Array.from({length: size}, () => 0));
+    },
+
+    on(row, col) {
+        return Boolean(this.data[row][col] & 8);
+    },
+    fn(row, col) {
+        return this.data[row][col] & 7;
+    },
+
+    set_on(row, col, on) {
+        this.data[row][col] = this.data[row][col] & 7 | (on ? 8 : 0);
+    },
+    set_fn(row, col, fn) {
+        if (fn < 0 || fn > 8) throw new Error("Invalid QR function.");
+        this.data[row][col] = this.data[row][col] & 8 | fn;
+    },
+
+    for(cbk) {
+        for (let i = 0; i < this.size; i++) {
+            for (let j = 0; j < this.size; j++) {
+                cbk(i, j);
+            }
+        }
+    }
+};
+
+const QR_FN_PATTERN = [
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5, 7,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5, 7,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5, 7,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5, 7,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,5,5,5, 7,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,5,5,5, 7,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,7, 3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3, 7,1,1,1,1,1,1,1],
+    [7,7,7,7,7,7,7,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 7,7,7,7,7,7,7,7],
+
+    [4,4,4,4,4,4,3,4, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 4,4,4,4,4,4,4,4],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,2,2,2,2, 2,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [0,0,0,0,2,2,2,2, 2,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [0,0,0,0,2,2,2,2, 2,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [0,0,0,0,2,2,2,2, 2,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [0,0,0,0,2,2,2,2, 2,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [5,5,5,5,5,5,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [5,5,5,5,5,5,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [5,5,5,5,5,5,3,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+
+    [7,7,7,7,7,7,7,7, 6,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 2,2,2,2,0,0,0,0],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+    [1,1,1,1,1,1,1,7, 4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0],
+];
+
+const MASK_FUNCS = [
+    (i, j) => (i + j) % 2 === 0,
+    (i, j) => i % 2 === 0,
+    (i, j) => j % 3 === 0,
+    (i, j) => (i + j) % 3 === 0,
+    (i, j) => (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0,
+    (i, j) => ((i * j) % 2) + ((i * j) % 3) === 0,
+    (i, j) => (((i * j) % 2) + ((i * j) % 3)) % 2 === 0,
+    (i, j) => (((i + j) % 2) + ((i * j) % 3)) % 2 === 0,
+];
+
+function draw_qr() {
+    const canvas = document.getElementById("qr-canvas");
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ccc";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const color_coding = [
+        "#000",
+        "#f00",
+        "#0f0",
+        "#00f",
+        "#0ff",
+        "#f0f",
+        "#ff0",
+        "#f80",
+    ];
+
+    QR.for((i, j) => {
+        if (QR.on(i, j)) {
+            ctx.fillStyle = color_coding[QR.fn(i, j)];
+        } else {
+            ctx.fillStyle = "#fff";
+        }
+
+        ctx.fillRect(10 * j + 40, 10 * i + 40, 10, 10);
+    });
 }
 
 // use qr[j][i] instead of qr[i][j] so that it corresponds to qr[x][y]
-const QR_SOURCE_SPLIT = QR_SOURCE.split("\n");
-for (let i = 0; i < qr_size; i += 2) {
-    for (let j = 0; j < qr_size; j++) {
-        switch (QR_SOURCE_SPLIT[i / 2][j]) {
-            case " ":
-                qr[j][i] = false;
-                if (i < 48) qr[j][i + 1] = false;
-                break;
+function read_from_hackmud_string(string) {
+    const lines = string.split("\n");
+    
+    QR.set_size_and_reset(lines[0].length);
+
+    QR.for((i, j) => {
+        if (i % 2 === 1) return;
+
+        switch (lines[i / 2][j]) {
             case "▀":
-                qr[j][i] = true;
-                if (i < 48) qr[j][i + 1] = false;
+                QR.set_on(i, j, true);
                 break;
             case "█":
-                qr[j][i] = true;
-                if (i < 48) qr[j][i + 1] = true;
-                break;
+                QR.set_on(i, j, true);
+                // fall-through;
             case "▄":
-                qr[j][i] = false;
-                if (i < 48) qr[j][i + 1] = true;
+                if (i + 1 < QR.size) QR.set_on(i + 1, j, true);
                 break;
+        }
+    });
+}
+
+function calc_fn_patterns() {
+    // set timing patterns
+    for (let i = 0; i < QR.size; i++) {
+        QR.set_fn(6, i, QR.FN_TIMING);
+        QR.set_fn(i, 6, QR.FN_TIMING);
+    }
+
+    QR.for((i, j) => {
+        if (i < 7 && j < 7 ||
+            i >= QR.size - 7 && j < 7 ||
+            i < 7 && j >= QR.size - 7)
+        {
+            QR.set_fn(i, j, QR.FN_FINDER);
+
+        } else if (i < 8 && j < 8 ||
+            i >= QR.size - 8 && j < 8 ||
+            i < 8 && j >= QR.size - 8)
+        {
+            QR.set_fn(i, j, QR.FN_SEP);
+
+        }
+    });
+}
+
+function get_format_info() {
+    // read first string
+
+}
+
+function main() {
+    read_from_hackmud_string(QR_SOURCE);
+    calc_fn_patterns();
+
+    QR.for((i, j) => {
+        if (QR.fn(i, j) == QR.FN_SEP) {
+            QR.set_on(i, j, !QR.on(i, j));
+        }
+    });
+
+    console.log(QR.size);
+    console.log(QR.data);
+    
+    draw_qr();
+}
+
+main();
+
+throw new Error("Done.");
+
+// we will assume that the QR code has no error for now
+
+const fmt_info_chain = [
+    [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8],
+    [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]
+];
+
+let fmt_info = 0;
+for (let [i, j] of fmt_info_chain) {
+    fmt_info = 2 * fmt_info + (qr[i][j] >> 3);
+}
+
+fmt_info ^= 0b101010000010010;
+console.log("Format info string:", "0b" + fmt_info.toString(2).padStart(15, "0"));
+
+const ec_levels = ["M", "L", "H", "Q"];
+
+let mask_pattern = (fmt_info >> 10) & 0b111;
+let ec_level = (fmt_info >> 13) & 0b11;
+
+console.log("Mask pattern:", mask_pattern);
+console.log("Error Correction level:", ec_levels[ec_level]);
+
+
+
+for (let i = 0; i < qr_size; i++) {
+    for (let j = 0; j < qr_size; j++) {
+        if (qr_fn(i, j) === QR_FN_DATA && mask_functions[mask_pattern](i, j)) {
+            qr[i][j] = 8 - qr[i][j]; // this works only because QR_FN_DATA is 0
         }
     }
 }
 
-const qrCanvas = document.getElementById("qr-canvas");
-const qrCtx = qrCanvas.getContext("2d");
-for (let x = 0; x < qr_size; x++) {
-    for (let y = 0; y < qr_size; y++) {
-        if (qr[x][y])
-            qrCtx.fillRect(10 * x, 10 * y, 10, 10);
+draw_qr();
+
+// time to walk the qr code :)
+
+const Dir = Object.freeze({
+    UP_SIDE: 0,
+    UP_DIAG: 1,
+    DOWN_SIDE: 2,
+    DOWN_DIAG: 3,
+});
+
+let row = qr_size - 1;
+let column = qr_size - 1;
+let dir = Dir.UP_SIDE;
+
+function advance() {
+    switch (dir) {
+        case Dir.UP_SIDE:
+            column -= 1;
+            dir = Dir.UP_DIAG;
+            break;
+        case Dir.UP_DIAG:
+            if (row === 0) {
+                column -= 1;
+                if (column === 6) {
+                    column -= 1;
+                }
+                dir = Dir.DOWN_SIDE;
+            } else {
+                column += 1;
+                row -= 1;
+                dir = Dir.UP_SIDE;
+            }
+            break;
+        case Dir.DOWN_SIDE:
+            column -= 1;
+            dir = Dir.DOWN_DIAG;
+            break;
+        case Dir.DOWN_DIAG:
+            if (row === qr_size - 1) {
+                column -= 1;
+                if (column === 6) {
+                    column -= 1;
+                }
+                dir = Dir.UP_SIDE;
+            } else {
+                column += 1;
+                row += 1;
+                dir = Dir.DOWN_SIDE;
+            }
+            break;
+    }
+
+    return column >= 0;
+}
+
+let data_string = "";
+do {
+    if (qr_fn(row, column) === QR_FN_DATA) {
+        data_string += qr_on(row, column);
+    }
+} while (advance());
+
+let idx = 0;
+function read(x) {
+    let ret = parseInt(data_string.slice(idx, idx + x), 2);
+    idx += x;
+    return ret;
+}
+
+const blocks = [
+    [[], 14],
+    [[], 14],
+    [[], 14],
+    [[], 14],
+    [[], 15],
+    [[], 15],
+]
+let cur_block = 0;
+for (let i = 0; i < 86; i++) {
+    while (blocks[cur_block][0].length === blocks[cur_block][1]) {
+        cur_block = (cur_block + 1) % blocks.length;
+    }
+    
+    blocks[cur_block][0].push(read(8));
+    
+    cur_block = (cur_block + 1) % blocks.length;
+}
+
+data_string = "";
+idx = 0;
+
+for (let [block, _] of blocks) {
+    for (let n of block) {
+        data_string += n.toString(2).padStart(8, "0");
     }
 }
+
+let mode = read(4);
+console.log("Encoding mode:", mode);
+if (mode !== 4) {
+    throw new Error("Currently only support BYTE encoding mode.");
+}
+
+let count = read(8);
+console.log("Character count:", count);
+
+console.log(blocks);
+
+let decoded_array = new Uint8Array(count);
+for (let i = 0; i < count; i++) {
+    decoded_array[i] = read(8);
+}
+
+console.log("Decoded array:", decoded_array);
+
+const decoder = new TextDecoder("utf-8");
+const decoded_string = decoder.decode(decoded_array);
+
+console.log("Final message:", decoded_string);
+
